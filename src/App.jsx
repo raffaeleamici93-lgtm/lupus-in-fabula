@@ -53,7 +53,7 @@ const EMAILJS_CONFIG = {
 };
 
 // Inserisci qui la tua OpenAI API Key (opzionale - se vuoi usare ChatGPT)
-const OPENAI_API_KEY = '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'; // es: 'sk-proj-...'
+const OPENAI_API_KEY = ''; // es: 'sk-proj-...'
 
 export default function LupusGame() {
   const [screen, setScreen] = useState('setup');
@@ -521,16 +521,106 @@ export default function LupusGame() {
 
           <div className="lg:col-span-2 bg-white/10 backdrop-blur-lg rounded-lg p-4 sm:p-6">
             {gameState.phase === 'night' ? (
-              <div className="text-center py-12">
-                <Moon size={64} className="mx-auto mb-4 text-blue-300" />
-                <h2 className="text-2xl font-bold text-white mb-4">🌙 Fase Notturna</h2>
-                <p className="text-white/80 mb-6">
-                  I giocatori con ruoli speciali effettuano le loro azioni.<br />
-                  Il narratore coordina: Lupi, Veggente, Guardia, ecc.
-                </p>
+              <div>
+                <div className="text-center mb-6">
+                  <Moon size={48} className="mx-auto mb-3 text-blue-300" />
+                  <h2 className="text-2xl font-bold text-white">🌙 Fase Notturna - Giorno {gameState.day}</h2>
+                  <p className="text-white/60 text-sm mt-2">Il narratore legge le azioni dei ruoli speciali ai giocatori</p>
+                </div>
+
+                <div className="space-y-4 mb-6">
+                  {/* Lupi Mannari */}
+                  {gameState.players.filter(p => p.alive && p.role === 'lupo').length > 0 && (
+                    <div className="bg-red-900/30 p-4 rounded-lg border-2 border-red-500/50">
+                      <h3 className="text-white font-bold flex items-center gap-2 mb-2">
+                        🐺 Lupi Mannari
+                      </h3>
+                      <p className="text-white/80 text-sm mb-3">
+                        I lupi si svegliano e scelgono chi eliminare. Comunicano tra loro in silenzio.
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {gameState.players.filter(p => p.alive && p.role === 'lupo').map((wolf, i) => (
+                          <span key={i} className="px-3 py-1 bg-red-500/30 rounded text-white text-sm">
+                            {wolf.name}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Veggente */}
+                  {gameState.players.filter(p => p.alive && p.role === 'veggente').length > 0 && (
+                    <div className="bg-purple-900/30 p-4 rounded-lg border-2 border-purple-500/50">
+                      <h3 className="text-white font-bold flex items-center gap-2 mb-2">
+                        🔮 Veggente
+                      </h3>
+                      <p className="text-white/80 text-sm mb-3">
+                        Il veggente si sveglia e può scoprire il ruolo di un giocatore.
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {gameState.players.filter(p => p.alive && p.role === 'veggente').map((seer, i) => (
+                          <span key={i} className="px-3 py-1 bg-purple-500/30 rounded text-white text-sm">
+                            {seer.name}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Guardia */}
+                  {gameState.players.filter(p => p.alive && p.role === 'guardia').length > 0 && (
+                    <div className="bg-blue-900/30 p-4 rounded-lg border-2 border-blue-500/50">
+                      <h3 className="text-white font-bold flex items-center gap-2 mb-2">
+                        🛡️ Guardia del Corpo
+                      </h3>
+                      <p className="text-white/80 text-sm mb-3">
+                        La guardia si sveglia e sceglie un giocatore da proteggere (non può proteggere la stessa persona due notti di fila).
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {gameState.players.filter(p => p.alive && p.role === 'guardia').map((guard, i) => (
+                          <span key={i} className="px-3 py-1 bg-blue-500/30 rounded text-white text-sm">
+                            {guard.name}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Strega */}
+                  {gameState.players.filter(p => p.alive && p.role === 'strega').length > 0 && (
+                    <div className="bg-green-900/30 p-4 rounded-lg border-2 border-green-500/50">
+                      <h3 className="text-white font-bold flex items-center gap-2 mb-2">
+                        🧙‍♀️ Strega
+                      </h3>
+                      <p className="text-white/80 text-sm mb-3">
+                        La strega si sveglia, scopre chi è stato attaccato e può usare la pozione di vita o di morte (una volta ciascuna per partita).
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {gameState.players.filter(p => p.alive && p.role === 'strega').map((witch, i) => (
+                          <span key={i} className="px-3 py-1 bg-green-500/30 rounded text-white text-sm">
+                            {witch.name}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="bg-yellow-900/20 p-4 rounded-lg mb-6">
+                  <h3 className="text-yellow-300 font-bold mb-2">📋 Istruzioni per il Narratore</h3>
+                  <ol className="text-white/80 text-sm space-y-1 list-decimal list-inside">
+                    <li>Leggi le azioni dei ruoli nell'ordine mostrato sopra</li>
+                    <li>Fai aprire gli occhi solo ai giocatori con il ruolo attivo</li>
+                    <li>Annota le scelte dei giocatori (chi viene attaccato, protetto, ecc.)</li>
+                    <li>Risolvi le azioni: se qualcuno è protetto, non muore</li>
+                    <li>Elimina il giocatore ucciso usando il pulsante "Elimina"</li>
+                    <li>Clicca "Torna alla Fase Diurna" per continuare</li>
+                  </ol>
+                </div>
+
                 <button
                   onClick={backToDayPhase}
-                  className="px-8 py-4 bg-gradient-to-r from-yellow-500 to-orange-500 rounded-lg font-bold text-white hover:from-yellow-600 hover:to-orange-600"
+                  className="w-full py-4 bg-gradient-to-r from-yellow-500 to-orange-500 rounded-lg font-bold text-white hover:from-yellow-600 hover:to-orange-600 flex items-center justify-center gap-2"
                 >
                   ☀️ Torna alla Fase Diurna
                 </button>
