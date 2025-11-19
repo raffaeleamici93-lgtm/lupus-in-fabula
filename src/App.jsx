@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Users, Mail, Play, Settings, Clock, CheckCircle, XCircle, Moon } from 'lucide-react';
 
 const ROLES = {
@@ -52,8 +52,7 @@ const EMAILJS_CONFIG = {
   publicKey: 'xhouAiPAy82A7TZl_'
 };
 
-// Inserisci qui la tua OpenAI API Key (opzionale - se vuoi usare ChatGPT)
-const OPENAI_API_KEY = ''; // es: 'sk-proj-...'
+const OPENAI_API_KEY = '';
 
 export default function LupusGame() {
   const [screen, setScreen] = useState('setup');
@@ -69,7 +68,7 @@ export default function LupusGame() {
   const [riddleStartTime, setRiddleStartTime] = useState(null);
   const [usedRiddles, setUsedRiddles] = useState(new Set());
 
-  React.useEffect(() => {
+  useEffect(() => {
     let interval;
     if (timerActive && timeLeft > 0) {
       interval = setInterval(() => {
@@ -199,7 +198,6 @@ export default function LupusGame() {
     
     let riddle = null;
     
-    // Prova prima con ChatGPT se hai la chiave
     if (OPENAI_API_KEY) {
       try {
         const response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -209,7 +207,7 @@ export default function LupusGame() {
             "Authorization": `Bearer ${OPENAI_API_KEY}`
           },
           body: JSON.stringify({
-            model: "gpt-4o-mini", // Modello economico
+            model: "gpt-4o-mini",
             messages: [
               { 
                 role: "user", 
@@ -232,7 +230,6 @@ export default function LupusGame() {
       }
     }
     
-    // Fallback a Claude se ChatGPT non funziona
     if (!riddle) {
       try {
         const response = await fetch("https://api.anthropic.com/v1/messages", {
@@ -263,7 +260,6 @@ export default function LupusGame() {
       }
     }
     
-    // Fallback a enigmi predefiniti
     if (!riddle) {
       const fallbackRiddles = [
         { enigma: "Sono leggero come una piuma, ma anche il più forte non può tenermi per più di 5 minuti. Cosa sono?", risposta: "respiro", indizio: "Pensate a qualcosa che fate continuamente..." },
@@ -529,7 +525,6 @@ export default function LupusGame() {
                 </div>
 
                 <div className="space-y-4 mb-6">
-                  {/* Lupi Mannari */}
                   {gameState.players.filter(p => p.alive && p.role === 'lupo').length > 0 && (
                     <div className="bg-red-900/30 p-4 rounded-lg border-2 border-red-500/50">
                       <h3 className="text-white font-bold flex items-center gap-2 mb-2">
@@ -548,7 +543,6 @@ export default function LupusGame() {
                     </div>
                   )}
 
-                  {/* Veggente */}
                   {gameState.players.filter(p => p.alive && p.role === 'veggente').length > 0 && (
                     <div className="bg-purple-900/30 p-4 rounded-lg border-2 border-purple-500/50">
                       <h3 className="text-white font-bold flex items-center gap-2 mb-2">
@@ -567,7 +561,6 @@ export default function LupusGame() {
                     </div>
                   )}
 
-                  {/* Guardia */}
                   {gameState.players.filter(p => p.alive && p.role === 'guardia').length > 0 && (
                     <div className="bg-blue-900/30 p-4 rounded-lg border-2 border-blue-500/50">
                       <h3 className="text-white font-bold flex items-center gap-2 mb-2">
@@ -586,7 +579,6 @@ export default function LupusGame() {
                     </div>
                   )}
 
-                  {/* Strega */}
                   {gameState.players.filter(p => p.alive && p.role === 'strega').length > 0 && (
                     <div className="bg-green-900/30 p-4 rounded-lg border-2 border-green-500/50">
                       <h3 className="text-white font-bold flex items-center gap-2 mb-2">
@@ -653,83 +645,72 @@ export default function LupusGame() {
                     <p className="text-white">Generazione enigma...</p>
                   </div>
                 ) : (
+                  <>
+                    <div className="bg-purple-900/40 p-4 sm:p-6 rounded-lg mb-4 sm:mb-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-2 text-white">
+                          <Clock size={20} className="sm:w-6 sm:h-6" />
+                          <span className="text-xl sm:text-2xl font-bold">{formatTime(timeLeft)}</span>
+                        </div>
+                        {timeLeft === 0 && (
+                          <span className="text-red-400 font-bold text-sm sm:text-base">Tempo scaduto!</span>
+                        )}
+                      </div>
+                      
+                      <p className="text-white text-base sm:text-lg mb-4">{currentRiddle.enigma}</p>
+                      
+                      <details className="text-yellow-300 text-sm">
+                        <summary className="cursor-pointer hover:text-yellow-200">💡 Indizio</summary>
+                        <p className="mt-2">{currentRiddle.indizio}</p>
+                      </details>
+                    </div>
+
+                    {timeLeft > 0 ? (
                       <>
-                        <div className="bg-purple-900/40 p-4 sm:p-6 rounded-lg mb-4 sm:mb-6">
-                          <div className="flex items-center justify-between mb-4">
-                            <div className="flex items-center gap-2 text-white">
-                              <Clock size={20} className="sm:w-6 sm:h-6" />
-                              <span className="text-xl sm:text-2xl font-bold">{formatTime(timeLeft)}</span>
-                            </div>
-                            {timeLeft === 0 && (
-                              <span className="text-red-400 font-bold text-sm sm:text-base">Tempo scaduto!</span>
-                            )}
-                          </div>
-                          
-                          <p className="text-white text-base sm:text-lg mb-4">{currentRiddle.enigma}</p>
-                          
-                          <details className="text-yellow-300 text-sm">
-                            <summary className="cursor-pointer hover:text-yellow-200">💡 Indizio</summary>
-                            <p className="mt-2">{currentRiddle.indizio}</p>
-                          </details>
+                        <div className="flex flex-col sm:flex-row gap-2 mb-4">
+                          <input
+                            type="text"
+                            placeholder="Inserisci la risposta..."
+                            value={riddleAnswer}
+                            onChange={(e) => setRiddleAnswer(e.target.value)}
+                            onKeyPress={(e) => e.key === 'Enter' && checkAnswer()}
+                            className="flex-1 px-4 py-3 rounded bg-white/20 text-white placeholder-white/60"
+                          />
+                          <button
+                            onClick={checkAnswer}
+                            className="px-6 py-3 bg-green-500 rounded font-semibold hover:bg-green-600 flex items-center justify-center gap-2 whitespace-nowrap"
+                          >
+                            <CheckCircle size={20} />
+                            Verifica
+                          </button>
                         </div>
 
-                        {timeLeft > 0 ? (
-                          <>
-                            <div className="flex flex-col sm:flex-row gap-2 mb-4">
-                              <input
-                                type="text"
-                                placeholder="Inserisci la risposta..."
-                                value={riddleAnswer}
-                                onChange={(e) => setRiddleAnswer(e.target.value)}
-                                onKeyPress={(e) => e.key === 'Enter' && checkAnswer()}
-                                className="flex-1 px-4 py-3 rounded bg-white/20 text-white placeholder-white/60"
-                              />
-                              <button
-                                onClick={checkAnswer}
-                                className="px-6 py-3 bg-green-500 rounded font-semibold hover:bg-green-600 flex items-center justify-center gap-2 whitespace-nowrap"
-                              >
-                                <CheckCircle size={20} />
-                                Verifica
-                              </button>
-                            </div>
-
-                            <div className="flex flex-col sm:flex-row gap-2">
-                              <button
-                                onClick={generateRiddle}
-                                className="flex-1 py-3 bg-blue-500/50 rounded font-semibold text-white hover:bg-blue-500/70 text-sm sm:text-base"
-                              >
-                                Genera Nuovo Enigma
-                              </button>
-                              <button
-                                onClick={goToNightPhase}
-                                className="flex-1 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 rounded font-semibold text-white hover:from-indigo-700 hover:to-purple-700 flex items-center justify-center gap-2 text-sm sm:text-base"
-                              >
-                                <Moon size={18} />
-                                Fase Notturna
-                              </button>
-                            </div>
-                          </>
-                        ) : (
+                        <div className="flex flex-col sm:flex-row gap-2">
+                          <button
+                            onClick={generateRiddle}
+                            className="flex-1 py-3 bg-blue-500/50 rounded font-semibold text-white hover:bg-blue-500/70 text-sm sm:text-base"
+                          >
+                            Genera Nuovo Enigma
+                          </button>
                           <button
                             onClick={goToNightPhase}
-                            className="w-full py-4 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg font-bold text-white hover:from-indigo-700 hover:to-purple-700 flex items-center justify-center gap-2"
+                            className="flex-1 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 rounded font-semibold text-white hover:from-indigo-700 hover:to-purple-700 flex items-center justify-center gap-2 text-sm sm:text-base"
                           >
-                            <Moon size={24} />
-                            Passa alla Fase Notturna
+                            <Moon size={18} />
+                            Fase Notturna
                           </button>
-                        )}
+                        </div>
                       </>
+                    ) : (
+                      <button
+                        onClick={goToNightPhase}
+                        className="w-full py-4 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg font-bold text-white hover:from-indigo-700 hover:to-purple-700 flex items-center justify-center gap-2"
+                      >
+                        <Moon size={24} />
+                        Passa alla Fase Notturna
+                      </button>
                     )}
                   </>
-                ) : (
-                  <div className="text-center py-12">
-                    <button
-                      onClick={generateRiddle}
-                      className="px-6 sm:px-8 py-3 sm:py-4 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg font-bold text-white text-lg sm:text-xl hover:from-purple-600 hover:to-pink-600"
-                    >
-                      Inizia Fase Diurna
-                    </button>
-                  </div>
                 )}
 
                 <div className="mt-6 p-4 bg-white/10 rounded">
