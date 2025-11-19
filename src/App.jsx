@@ -67,6 +67,8 @@ export default function LupusGame() {
   const [timerActive, setTimerActive] = useState(false);
   const [riddleStartTime, setRiddleStartTime] = useState(null);
   const [usedRiddles, setUsedRiddles] = useState(new Set());
+  const [showLynchVoting, setShowLynchVoting] = useState(false);
+  const [votes, setVotes] = useState({});
 
   useEffect(() => {
     let interval;
@@ -196,81 +198,50 @@ export default function LupusGame() {
     setCurrentRiddle({ loading: true });
     setRiddleStartTime(Date.now());
     
-    let riddle = null;
+    // Database più ampio di enigmi predefiniti
+    const allRiddles = [
+      { enigma: "Sono leggero come una piuma, ma anche il più forte non può tenermi per più di 5 minuti. Cosa sono?", risposta: "respiro", indizio: "Pensate a qualcosa che fate continuamente..." },
+      { enigma: "Ho città senza case, foreste senza alberi, fiumi senza acqua. Cosa sono?", risposta: "mappa", indizio: "È qualcosa che rappresenta il mondo..." },
+      { enigma: "Più ne togli, più divento grande. Cosa sono?", risposta: "buco", indizio: "Pensate a qualcosa di vuoto..." },
+      { enigma: "Ho 88 tasti ma non posso aprire nessuna porta. Cosa sono?", risposta: "pianoforte", indizio: "È uno strumento musicale..." },
+      { enigma: "Vado su e giù ma non mi muovo mai. Cosa sono?", risposta: "scala", indizio: "Pensate a qualcosa che collega piani diversi..." },
+      { enigma: "Ho un collo ma non ho testa. Cosa sono?", risposta: "bottiglia", indizio: "La usi per bere..." },
+      { enigma: "Corro ma non ho gambe, urlo ma non ho bocca. Cosa sono?", risposta: "fiume", indizio: "Scorre in natura..." },
+      { enigma: "Più sono grande, meno mi vedi. Cosa sono?", risposta: "buio", indizio: "È l'opposto della luce..." },
+      { enigma: "Ho denti ma non posso mordere. Cosa sono?", risposta: "pettine", indizio: "Lo usi per i capelli..." },
+      { enigma: "Sono sempre davanti a te ma non mi puoi vedere. Cosa sono?", risposta: "futuro", indizio: "Ha a che fare con il tempo..." },
+      { enigma: "Ho quattro gambe al mattino, due a mezzogiorno e tre alla sera. Cosa sono?", risposta: "uomo", indizio: "Famoso enigma della Sfinge..." },
+      { enigma: "Più è nero, più è pulito. Cosa sono?", risposta: "lavagna", indizio: "La trovi in classe..." },
+      { enigma: "Ho ali ma non sono un uccello, volo senza motore. Cosa sono?", risposta: "aquilone", indizio: "Gioco con il vento..." },
+      { enigma: "Sono pieno di buchi ma posso contenere acqua. Cosa sono?", risposta: "spugna", indizio: "La usi per lavare..." },
+      { enigma: "Più dai, più divento leggero. Cosa sono?", risposta: "segreto", indizio: "Condividerlo ti alleggerisce..." },
+      { enigma: "Ho una testa e una coda ma non ho corpo. Cosa sono?", risposta: "moneta", indizio: "La usi per pagare..." },
+      { enigma: "Sono sempre in corsa ma non mi muovo mai. Cosa sono?", risposta: "orologio", indizio: "Segna il tempo..." },
+      { enigma: "Ho mille occhi ma non vedo. Cosa sono?", risposta: "formaggio", indizio: "È un alimento con i buchi..." },
+      { enigma: "Rompo senza essere toccato, parlo senza bocca. Cosa sono?", risposta: "silenzio", indizio: "È l'assenza di rumore..." },
+      { enigma: "Sono il padre di tutti gli alberi ma non ho radici. Cosa sono?", risposta: "seme", indizio: "Da me nasce la pianta..." },
+      { enigma: "Più mi asciughi, più divento bagnato. Cosa sono?", risposta: "asciugamano", indizio: "Lo usi dopo la doccia..." },
+      { enigma: "Ho strade ma nessuna macchina, città ma nessuna casa. Cosa sono?", risposta: "gioco da tavolo", indizio: "Pensate al Monopoli..." },
+      { enigma: "Tutti mi hanno ma nessuno può perdermi. Cosa sono?", risposta: "ombra", indizio: "Ti segue sempre..." },
+      { enigma: "Ho voce ma non parlo, suono senza strumento. Cosa sono?", risposta: "eco", indizio: "Ti risponde nelle montagne..." },
+      { enigma: "Sono dentro e fuori allo stesso tempo. Cosa sono?", risposta: "porta", indizio: "Separa due stanze..." },
+      { enigma: "Più sono fresco, più sono caldo. Cosa sono?", risposta: "pane", indizio: "Appena sfornato..." },
+      { enigma: "Ho pagine ma non sono un libro, ho foglie ma non sono un albero. Cosa sono?", risposta: "quaderno", indizio: "Ci scrivi sopra..." },
+      { enigma: "Salgo ma non scendo mai. Cosa sono?", risposta: "età", indizio: "Aumenta con il tempo..." },
+      { enigma: "Sono ovunque ma non occupo spazio. Cosa sono?", risposta: "aria", indizio: "La respiri..." },
+      { enigma: "Ho radici che nessuno vede, sono più alto degli alberi, cresco senza crescere. Cosa sono?", risposta: "montagna", indizio: "È un rilievo naturale..." }
+    ];
     
-    if (OPENAI_API_KEY) {
-      try {
-        const response = await fetch("https://api.openai.com/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${OPENAI_API_KEY}`
-          },
-          body: JSON.stringify({
-            model: "gpt-4o-mini",
-            messages: [
-              { 
-                role: "user", 
-                content: `Crea un enigma originale e divertente per un gioco di Lupus in Fabula. NON usare questi enigmi già usati: ${Array.from(usedRiddles).join(', ')}. L'enigma deve essere risolvibile in gruppo in 5 minuti. Rispondi SOLO con un JSON in questo formato:
-{"enigma": "testo dell'enigma", "risposta": "risposta corretta", "indizio": "un piccolo aiuto"}` 
-              }
-            ],
-            temperature: 1.2
-          })
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          const text = data.choices[0].message.content;
-          const cleanText = text.replace(/```json|```/g, "").trim();
-          riddle = JSON.parse(cleanText);
-        }
-      } catch (error) {
-        console.log("ChatGPT non disponibile, uso Claude...");
-      }
-    }
+    // Filtra enigmi non ancora usati
+    const availableRiddles = allRiddles.filter(r => !usedRiddles.has(r.enigma));
     
-    if (!riddle) {
-      try {
-        const response = await fetch("https://api.anthropic.com/v1/messages", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model: "claude-sonnet-4-20250514",
-            max_tokens: 1000,
-            messages: [
-              { 
-                role: "user", 
-                content: `Crea un enigma completamente NUOVO e originale per Lupus in Fabula. NON riutilizzare questi: ${Array.from(usedRiddles).join(', ')}. Rispondi SOLO con JSON:
-{"enigma": "testo dell'enigma", "risposta": "risposta corretta", "indizio": "un piccolo aiuto"}` 
-              }
-            ],
-            temperature: 1
-          })
-        });
-
-        const data = await response.json();
-        const text = data.content[0].text;
-        const cleanText = text.replace(/```json|```/g, "").trim();
-        riddle = JSON.parse(cleanText);
-      } catch (error) {
-        console.error("Errore generazione enigma:", error);
-      }
-    }
-    
-    if (!riddle) {
-      const fallbackRiddles = [
-        { enigma: "Sono leggero come una piuma, ma anche il più forte non può tenermi per più di 5 minuti. Cosa sono?", risposta: "respiro", indizio: "Pensate a qualcosa che fate continuamente..." },
-        { enigma: "Ho città senza case, foreste senza alberi, fiumi senza acqua. Cosa sono?", risposta: "mappa", indizio: "È qualcosa che rappresenta il mondo..." },
-        { enigma: "Più ne togli, più divento grande. Cosa sono?", risposta: "buco", indizio: "Pensate a qualcosa di vuoto..." },
-        { enigma: "Ho 88 tasti ma non posso aprire nessuna porta. Cosa sono?", risposta: "pianoforte", indizio: "È uno strumento musicale..." },
-        { enigma: "Vado su e giù ma non mi muovo mai. Cosa sono?", risposta: "scala", indizio: "Pensate a qualcosa che collega piani diversi..." }
-      ];
-      
-      const available = fallbackRiddles.filter(r => !usedRiddles.has(r.enigma));
-      riddle = available.length > 0 ? available[Math.floor(Math.random() * available.length)] : fallbackRiddles[0];
+    // Se li abbiamo usati tutti, resetta
+    let riddle;
+    if (availableRiddles.length === 0) {
+      setUsedRiddles(new Set());
+      riddle = allRiddles[Math.floor(Math.random() * allRiddles.length)];
+    } else {
+      riddle = availableRiddles[Math.floor(Math.random() * availableRiddles.length)];
     }
     
     setUsedRiddles(prev => new Set([...prev, riddle.enigma]));
@@ -313,10 +284,55 @@ export default function LupusGame() {
 
   const goToNightPhase = () => {
     if (confirm('Passare alla fase notturna?')) {
+      setShowLynchVoting(false);
+      setVotes({});
       setGameState(prev => ({ ...prev, phase: 'night', day: prev.day + 1 }));
       setCurrentRiddle(null);
       setTimerActive(false);
-      alert('🌙 Fase Notturna\n\nI giocatori con ruoli speciali effettuano le loro azioni. Il narratore coordina le scelte e poi si torna alla fase diurna.');
+    }
+  };
+
+  const startLynchVoting = () => {
+    setShowLynchVoting(true);
+    setVotes({});
+  };
+
+  const castVote = (voterId, targetId) => {
+    setVotes(prev => ({
+      ...prev,
+      [voterId]: targetId
+    }));
+  };
+
+  const finalizeLynch = () => {
+    const alivePlayers = gameState.players.filter(p => p.alive);
+    const voteCounts = {};
+    
+    Object.values(votes).forEach(targetId => {
+      voteCounts[targetId] = (voteCounts[targetId] || 0) + 1;
+    });
+    
+    let maxVotes = 0;
+    let lynched = null;
+    
+    Object.entries(voteCounts).forEach(([playerId, count]) => {
+      if (count > maxVotes) {
+        maxVotes = count;
+        lynched = playerId;
+      }
+    });
+    
+    if (lynched) {
+      const lynchedIndex = gameState.players.findIndex(p => p.name === lynched);
+      if (lynchedIndex !== -1) {
+        eliminatePlayer(lynchedIndex);
+        setShowLynchVoting(false);
+        setVotes({});
+      }
+    } else {
+      alert('Nessun giocatore è stato linciato (pareggio o nessun voto)');
+      setShowLynchVoting(false);
+      setVotes({});
     }
   };
 
@@ -621,7 +637,63 @@ export default function LupusGame() {
               <>
                 <h2 className="text-xl sm:text-2xl font-bold text-white mb-4">Fase Diurna - Enigma</h2>
                 
-                {!currentRiddle ? (
+                {showLynchVoting ? (
+                  <div>
+                    <div className="bg-red-900/30 p-4 sm:p-6 rounded-lg mb-6 border-2 border-red-500/50">
+                      <h3 className="text-white font-bold text-lg mb-3">⚖️ Votazione per il Linciaggio</h3>
+                      <p className="text-white/80 text-sm mb-4">
+                        Ogni giocatore vota chi eliminare. Il giocatore con più voti viene linciato.
+                      </p>
+                      
+                      <div className="space-y-4">
+                        {gameState.players.filter(p => p.alive).map((voter, i) => (
+                          <div key={i} className="bg-white/10 p-4 rounded">
+                            <p className="text-white font-semibold mb-2">
+                              Voto di {voter.name}:
+                            </p>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                              {gameState.players.filter(p => p.alive && p.name !== voter.name).map((target, j) => (
+                                <button
+                                  key={j}
+                                  onClick={() => castVote(voter.name, target.name)}
+                                  className={`px-3 py-2 rounded text-sm font-semibold transition-all ${
+                                    votes[voter.name] === target.name
+                                      ? 'bg-red-500 text-white'
+                                      : 'bg-white/20 text-white/80 hover:bg-white/30'
+                                  }`}
+                                >
+                                  {target.name}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      
+                      <div className="mt-6 flex flex-col sm:flex-row gap-2">
+                        <button
+                          onClick={finalizeLynch}
+                          disabled={Object.keys(votes).length < gameState.players.filter(p => p.alive).length}
+                          className="flex-1 py-3 bg-red-600 rounded font-bold text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Conferma Linciaggio
+                        </button>
+                        <button
+                          onClick={() => setShowLynchVoting(false)}
+                          className="flex-1 py-3 bg-gray-600 rounded font-bold text-white hover:bg-gray-700"
+                        >
+                          Annulla
+                        </button>
+                      </div>
+                      
+                      {Object.keys(votes).length < gameState.players.filter(p => p.alive).length && (
+                        <p className="text-yellow-300 text-sm text-center mt-3">
+                          Tutti devono votare per procedere ({Object.keys(votes).length}/{gameState.players.filter(p => p.alive).length})
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ) : !currentRiddle ? (
                   <div className="text-center py-12">
                     <button
                       onClick={generateRiddle}
@@ -629,10 +701,16 @@ export default function LupusGame() {
                     >
                       Inizia Enigma
                     </button>
-                    <div className="mt-4">
+                    <div className="flex flex-col sm:flex-row gap-3 justify-center items-center mt-4">
+                      <button
+                        onClick={startLynchVoting}
+                        className="px-6 py-3 bg-gradient-to-r from-red-600 to-orange-600 rounded-lg font-bold text-white hover:from-red-700 hover:to-orange-700 flex items-center justify-center gap-2"
+                      >
+                        ⚖️ Votazione Linciaggio
+                      </button>
                       <button
                         onClick={goToNightPhase}
-                        className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg font-bold text-white hover:from-indigo-700 hover:to-purple-700 flex items-center justify-center gap-2 mx-auto"
+                        className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg font-bold text-white hover:from-indigo-700 hover:to-purple-700 flex items-center justify-center gap-2"
                       >
                         <Moon size={20} />
                         Vai alla Fase Notturna
@@ -693,6 +771,12 @@ export default function LupusGame() {
                             Genera Nuovo Enigma
                           </button>
                           <button
+                            onClick={startLynchVoting}
+                            className="flex-1 py-3 bg-gradient-to-r from-red-600 to-orange-600 rounded font-semibold text-white hover:from-red-700 hover:to-orange-700 flex items-center justify-center gap-2 text-sm sm:text-base"
+                          >
+                            ⚖️ Linciaggio
+                          </button>
+                          <button
                             onClick={goToNightPhase}
                             className="flex-1 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 rounded font-semibold text-white hover:from-indigo-700 hover:to-purple-700 flex items-center justify-center gap-2 text-sm sm:text-base"
                           >
@@ -704,21 +788,29 @@ export default function LupusGame() {
                     ) : (
                       <button
                         onClick={goToNightPhase}
-                        className="w-full py-4 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg font-bold text-white hover:from-indigo-700 hover:to-purple-700 flex items-center justify-center gap-2"
+                        className="w-full py-4 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg font-bold text-white hover:from-indigo-700 hover:to-purple-700 flex items-center justify-center gap-2 mb-3"
                       >
                         <Moon size={24} />
                         Passa alla Fase Notturna
                       </button>
-                    )}
-                  </>
-                )}
+                      <button
+                        onClick={startLynchVoting}
+                        className="w-full py-3 bg-gradient-to-r from-red-600 to-orange-600 rounded-lg font-bold text-white hover:from-red-700 hover:to-orange-700 flex items-center justify-center gap-2"
+                      >
+                        ⚖️ Votazione Linciaggio
+                      </button>
+                    </>
+                  )}
+                </>
+              )}
 
                 <div className="mt-6 p-4 bg-white/10 rounded">
                   <h3 className="text-white font-bold mb-2 text-sm sm:text-base">Come funziona:</h3>
                   <ul className="text-white/80 text-xs sm:text-sm space-y-1">
                     <li>• Durante il giorno, i giocatori risolvono enigmi insieme</li>
                     <li>• Più velocemente risolvete, più punti guadagnate!</li>
-                    <li>• Gli enigmi sono generati con AI e sempre diversi</li>
+                    <li>• Usate "Votazione Linciaggio" per eliminare un sospetto</li>
+                    <li>• Gli enigmi sono sempre diversi (30+ enigmi disponibili)</li>
                     <li>• Solo tu (Game Master) devi avere l'app aperta</li>
                   </ul>
                 </div>
