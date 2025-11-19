@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Users, Mail, Play, Settings, Clock, CheckCircle, XCircle } from 'lucide-react';
+import { Users, Mail, Play, Settings, Clock, CheckCircle, XCircle, Moon } from 'lucide-react';
 
 const ROLES = {
   lupo: {
@@ -46,12 +46,14 @@ const ROLES = {
   }
 };
 
-// IMPORTANTE: Inserisci qui i tuoi dati EmailJS
 const EMAILJS_CONFIG = {
   serviceId: 'service_y5ydcb8',
   templateId: 'template_fk57qj7',
   publicKey: 'xhouAiPAy82A7TZl_'
 };
+
+// Inserisci qui la tua OpenAI API Key (opzionale - se vuoi usare ChatGPT)
+const OPENAI_API_KEY = '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'; // es: 'sk-proj-...'
 
 export default function LupusGame() {
   const [screen, setScreen] = useState('setup');
@@ -64,21 +66,24 @@ export default function LupusGame() {
   const [riddleAnswer, setRiddleAnswer] = useState('');
   const [timeLeft, setTimeLeft] = useState(300);
   const [timerActive, setTimerActive] = useState(false);
+  const [riddleStartTime, setRiddleStartTime] = useState(null);
+  const [usedRiddles, setUsedRiddles] = useState(new Set());
 
-  // Timer effect
   React.useEffect(() => {
     let interval;
     if (timerActive && timeLeft > 0) {
       interval = setInterval(() => {
         setTimeLeft(t => t - 1);
       }, 1000);
+    } else if (timeLeft === 0) {
+      setTimerActive(false);
     }
     return () => clearInterval(interval);
   }, [timerActive, timeLeft]);
 
   const addPlayer = () => {
     if (newPlayerName && newPlayerEmail) {
-      setPlayers([...players, { name: newPlayerName, email: newPlayerEmail, alive: true }]);
+      setPlayers([...players, { name: newPlayerName, email: newPlayerEmail, alive: true, points: 0 }]);
       setNewPlayerName('');
       setNewPlayerEmail('');
     }
@@ -179,68 +184,149 @@ export default function LupusGame() {
       players: playersWithRoles,
       day: 1,
       phase: 'day',
-      riddlesSolved: 0
+      riddlesSolved: 0,
+      totalPoints: 0
     });
     
     setScreen('game');
+    setUsedRiddles(new Set());
     generateRiddle();
   };
 
   const generateRiddle = async () => {
     setCurrentRiddle({ loading: true });
+    setRiddleStartTime(Date.now());
     
-    try {
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 1000,
-          messages: [
-            { 
-              role: "user", 
-              content: `Crea un enigma originale e divertente per un gioco di Lupus in Fabula. L'enigma deve essere risolvibile in gruppo in 5 minuti. Rispondi SOLO con un JSON in questo formato esatto (niente altro testo):
-{
-  "enigma": "testo dell'enigma",
-  "risposta": "risposta corretta (una parola o frase breve)",
-  "indizio": "un piccolo aiuto se necessario"
-}` 
-            }
-          ],
-        })
-      });
+    let riddle = null;
+    
+    // Prova prima con ChatGPT se hai la chiave
+    if (OPENAI_API_KEY) {
+      try {
+        const response = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${OPENAI_API_KEY}`
+          },
+          body: JSON.stringify({
+            model: "gpt-4o-mini", // Modello economico
+            messages: [
+              { 
+                role: "user", 
+                content: `Crea un enigma originale e divertente per un gioco di Lupus in Fabula. NON usare questi enigmi già usati: ${Array.from(usedRiddles).join(', ')}. L'enigma deve essere risolvibile in gruppo in 5 minuti. Rispondi SOLO con un JSON in questo formato:
+{"enigma": "testo dell'enigma", "risposta": "risposta corretta", "indizio": "un piccolo aiuto"}` 
+              }
+            ],
+            temperature: 1.2
+          })
+        });
 
-      const data = await response.json();
-      const text = data.content[0].text;
-      const cleanText = text.replace(/```json|```/g, "").trim();
-      const riddle = JSON.parse(cleanText);
-      
-      setCurrentRiddle(riddle);
-      setTimeLeft(300);
-      setTimerActive(true);
-    } catch (error) {
-      setCurrentRiddle({
-        enigma: "Sono il principio della fine, la fine dello spazio e del tempo. Cosa sono?",
-        risposta: "e",
-        indizio: "Pensa alle lettere delle parole..."
-      });
-      setTimeLeft(300);
-      setTimerActive(true);
+        if (response.ok) {
+          const data = await response.json();
+          const text = data.choices[0].message.content;
+          const cleanText = text.replace(/```json|```/g, "").trim();
+          riddle = JSON.parse(cleanText);
+        }
+      } catch (error) {
+        console.log("ChatGPT non disponibile, uso Claude...");
+      }
     }
+    
+    // Fallback a Claude se ChatGPT non funziona
+    if (!riddle) {
+      try {
+        const response = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "claude-sonnet-4-20250514",
+            max_tokens: 1000,
+            messages: [
+              { 
+                role: "user", 
+                content: `Crea un enigma completamente NUOVO e originale per Lupus in Fabula. NON riutilizzare questi: ${Array.from(usedRiddles).join(', ')}. Rispondi SOLO con JSON:
+{"enigma": "testo dell'enigma", "risposta": "risposta corretta", "indizio": "un piccolo aiuto"}` 
+              }
+            ],
+            temperature: 1
+          })
+        });
+
+        const data = await response.json();
+        const text = data.content[0].text;
+        const cleanText = text.replace(/```json|```/g, "").trim();
+        riddle = JSON.parse(cleanText);
+      } catch (error) {
+        console.error("Errore generazione enigma:", error);
+      }
+    }
+    
+    // Fallback a enigmi predefiniti
+    if (!riddle) {
+      const fallbackRiddles = [
+        { enigma: "Sono leggero come una piuma, ma anche il più forte non può tenermi per più di 5 minuti. Cosa sono?", risposta: "respiro", indizio: "Pensate a qualcosa che fate continuamente..." },
+        { enigma: "Ho città senza case, foreste senza alberi, fiumi senza acqua. Cosa sono?", risposta: "mappa", indizio: "È qualcosa che rappresenta il mondo..." },
+        { enigma: "Più ne togli, più divento grande. Cosa sono?", risposta: "buco", indizio: "Pensate a qualcosa di vuoto..." },
+        { enigma: "Ho 88 tasti ma non posso aprire nessuna porta. Cosa sono?", risposta: "pianoforte", indizio: "È uno strumento musicale..." },
+        { enigma: "Vado su e giù ma non mi muovo mai. Cosa sono?", risposta: "scala", indizio: "Pensate a qualcosa che collega piani diversi..." }
+      ];
+      
+      const available = fallbackRiddles.filter(r => !usedRiddles.has(r.enigma));
+      riddle = available.length > 0 ? available[Math.floor(Math.random() * available.length)] : fallbackRiddles[0];
+    }
+    
+    setUsedRiddles(prev => new Set([...prev, riddle.enigma]));
+    setCurrentRiddle(riddle);
+    setTimeLeft(300);
+    setTimerActive(true);
+  };
+
+  const calculatePoints = (timeElapsed) => {
+    const seconds = Math.floor(timeElapsed / 1000);
+    const maxPoints = 1000;
+    const minPoints = 100;
+    
+    if (seconds <= 30) return maxPoints;
+    if (seconds >= 300) return minPoints;
+    
+    const points = maxPoints - ((maxPoints - minPoints) * (seconds / 300));
+    return Math.round(points);
   };
 
   const checkAnswer = () => {
     if (riddleAnswer.toLowerCase().trim() === currentRiddle.risposta.toLowerCase().trim()) {
-      alert('✅ Risposta corretta! Il villaggio è salvo per oggi.');
-      setGameState(prev => ({ ...prev, riddlesSolved: prev.riddlesSolved + 1 }));
+      const timeElapsed = Date.now() - riddleStartTime;
+      const points = calculatePoints(timeElapsed);
+      
+      alert(`✅ Risposta corretta!\n🎯 Punti guadagnati: ${points}\n⏱️ Tempo impiegato: ${Math.floor(timeElapsed/1000)}s`);
+      
+      setGameState(prev => ({ 
+        ...prev, 
+        riddlesSolved: prev.riddlesSolved + 1,
+        totalPoints: prev.totalPoints + points
+      }));
       setTimerActive(false);
       setRiddleAnswer('');
       setCurrentRiddle(null);
     } else {
       alert('❌ Risposta errata. Riprovate!');
     }
+  };
+
+  const goToNightPhase = () => {
+    if (confirm('Passare alla fase notturna?')) {
+      setGameState(prev => ({ ...prev, phase: 'night', day: prev.day + 1 }));
+      setCurrentRiddle(null);
+      setTimerActive(false);
+      alert('🌙 Fase Notturna\n\nI giocatori con ruoli speciali effettuano le loro azioni. Il narratore coordina le scelte e poi si torna alla fase diurna.');
+    }
+  };
+
+  const backToDayPhase = () => {
+    setGameState(prev => ({ ...prev, phase: 'day' }));
+    generateRiddle();
   };
 
   const eliminatePlayer = (playerIndex) => {
@@ -269,17 +355,17 @@ export default function LupusGame() {
 
   if (screen === 'setup') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-900 p-6">
+      <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-900 p-4 sm:p-6">
         <div className="max-w-4xl mx-auto">
-          <h1 className="text-4xl font-bold text-white mb-8 text-center">🌙 Lupus in Fabula</h1>
+          <h1 className="text-3xl sm:text-4xl font-bold text-white mb-6 sm:mb-8 text-center">🌙 Lupus in Fabula</h1>
           
-          <div className="bg-white/10 backdrop-blur-lg rounded-lg p-6 mb-6">
-            <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
+          <div className="bg-white/10 backdrop-blur-lg rounded-lg p-4 sm:p-6 mb-4 sm:mb-6">
+            <h2 className="text-xl sm:text-2xl font-bold text-white mb-4 flex items-center gap-2">
               <Users size={24} />
               Giocatori ({players.length})
             </h2>
             
-            <div className="flex gap-2 mb-4">
+            <div className="flex flex-col sm:flex-row gap-2 mb-4">
               <input
                 type="text"
                 placeholder="Nome"
@@ -296,7 +382,7 @@ export default function LupusGame() {
                 className="flex-1 px-4 py-2 rounded bg-white/20 text-white placeholder-white/60"
                 onKeyPress={(e) => e.key === 'Enter' && addPlayer()}
               />
-              <button onClick={addPlayer} className="px-6 py-2 bg-green-500 rounded font-semibold hover:bg-green-600">
+              <button onClick={addPlayer} className="px-6 py-2 bg-green-500 rounded font-semibold hover:bg-green-600 whitespace-nowrap">
                 Aggiungi
               </button>
             </div>
@@ -304,11 +390,11 @@ export default function LupusGame() {
             <div className="space-y-2 max-h-48 overflow-y-auto">
               {players.map((p, i) => (
                 <div key={i} className="flex justify-between items-center bg-white/20 p-3 rounded">
-                  <div>
-                    <span className="text-white font-semibold">{p.name}</span>
-                    <span className="text-white/60 text-sm ml-2">{p.email}</span>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-white font-semibold block truncate">{p.name}</span>
+                    <span className="text-white/60 text-sm block truncate">{p.email}</span>
                   </div>
-                  <button onClick={() => removePlayer(i)} className="text-red-400 hover:text-red-300">
+                  <button onClick={() => removePlayer(i)} className="text-red-400 hover:text-red-300 ml-2">
                     <XCircle size={20} />
                   </button>
                 </div>
@@ -316,13 +402,13 @@ export default function LupusGame() {
             </div>
           </div>
 
-          <div className="bg-white/10 backdrop-blur-lg rounded-lg p-6 mb-6">
-            <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
+          <div className="bg-white/10 backdrop-blur-lg rounded-lg p-4 sm:p-6 mb-4 sm:mb-6">
+            <h2 className="text-xl sm:text-2xl font-bold text-white mb-4 flex items-center gap-2">
               <Settings size={24} />
               Ruoli
             </h2>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {Object.entries(ROLES).map(([key, role]) => (
                 <div 
                   key={key}
@@ -334,8 +420,8 @@ export default function LupusGame() {
                   } ${(key === 'lupo' || key === 'villico') ? 'opacity-100' : ''}`}
                 >
                   <div className="flex items-start gap-3">
-                    <span className="text-3xl">{role.icon}</span>
-                    <div className="flex-1">
+                    <span className="text-2xl sm:text-3xl">{role.icon}</span>
+                    <div className="flex-1 min-w-0">
                       <h3 className="text-white font-bold">{role.name}</h3>
                       <p className="text-white/70 text-sm">{role.description}</p>
                       {(key === 'lupo' || key === 'villico') && (
@@ -349,7 +435,7 @@ export default function LupusGame() {
             
             {players.length > 0 && (
               <div className="mt-4 p-4 bg-blue-500/20 rounded">
-                <p className="text-white">
+                <p className="text-white text-sm">
                   <strong>Lupi Mannari previsti:</strong> {calculateWolves(players.length)}
                   <br />
                   <strong>Ruoli speciali:</strong> {selectedRoles.filter(r => r !== 'lupo' && r !== 'villico').length}
@@ -361,41 +447,16 @@ export default function LupusGame() {
           </div>
 
           <button
-            onClick={async () => {
-              if (players.length === 0) {
-                alert('Aggiungi almeno un giocatore per testare!');
-                return;
-              }
-              
-              const testPlayer = players[0];
-              alert(`Invio email di test a: ${testPlayer.email}\n\nControlla la console (F12) per vedere la risposta dell'API.`);
-              
-              const result = await sendEmailViaAPI(testPlayer, 'veggente');
-              
-              if (result.success) {
-                alert(`✅ Email di test inviata con successo a ${testPlayer.email}!\n\nControlla la tua casella (anche spam).`);
-              } else {
-                alert(`❌ Errore nell'invio:\n${result.error}\n\nDettagli nella console (F12)`);
-              }
-            }}
-            disabled={players.length === 0}
-            className="w-full py-3 bg-blue-500 rounded-lg font-bold text-white hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mb-4"
-          >
-            <Mail size={20} />
-            Test Email (primo giocatore)
-          </button>
-
-          <button
             onClick={startGame}
             disabled={players.length < 4}
-            className="w-full py-4 bg-gradient-to-r from-green-500 to-emerald-600 rounded-lg font-bold text-white text-xl hover:from-green-600 hover:to-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="w-full py-4 bg-gradient-to-r from-green-500 to-emerald-600 rounded-lg font-bold text-white text-lg sm:text-xl hover:from-green-600 hover:to-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             <Play size={24} />
             Inizia Partita
           </button>
           
           {players.length < 4 && (
-            <p className="text-yellow-300 text-center mt-2">Servono almeno 4 giocatori</p>
+            <p className="text-yellow-300 text-center mt-2 text-sm">Servono almeno 4 giocatori</p>
           )}
         </div>
       </div>
@@ -403,38 +464,41 @@ export default function LupusGame() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-4 sm:p-6">
       <div className="max-w-6xl mx-auto">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold text-white">Giorno {gameState.day}</h1>
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-white">Giorno {gameState.day}</h1>
+            <p className="text-white/80 text-sm">Fase: {gameState.phase === 'day' ? '☀️ Diurna' : '🌙 Notturna'} | Punti: {gameState.totalPoints}</p>
+          </div>
           <button 
             onClick={() => setScreen('setup')}
-            className="px-4 py-2 bg-red-500/20 text-red-300 rounded hover:bg-red-500/30"
+            className="px-4 py-2 bg-red-500/20 text-red-300 rounded hover:bg-red-500/30 text-sm"
           >
             Termina Partita
           </button>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-1 bg-white/10 backdrop-blur-lg rounded-lg p-6">
-            <h2 className="text-xl font-bold text-white mb-4">Giocatori</h2>
-            <div className="space-y-2">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+          <div className="lg:col-span-1 bg-white/10 backdrop-blur-lg rounded-lg p-4 sm:p-6">
+            <h2 className="text-lg sm:text-xl font-bold text-white mb-4">Giocatori</h2>
+            <div className="space-y-2 max-h-96 overflow-y-auto">
               {gameState.players.map((p, i) => (
                 <div 
                   key={i}
                   className={`p-3 rounded ${p.alive ? 'bg-white/20' : 'bg-red-900/30'}`}
                 >
                   <div className="flex justify-between items-center">
-                    <div>
-                      <span className={`font-semibold ${p.alive ? 'text-white' : 'text-white/40 line-through'}`}>
+                    <div className="flex-1 min-w-0">
+                      <span className={`font-semibold block truncate ${p.alive ? 'text-white' : 'text-white/40 line-through'}`}>
                         {p.name}
                       </span>
                       <span className="text-xs text-white/60 block">{ROLES[p.role].icon} {ROLES[p.role].name}</span>
                     </div>
-                    {p.alive && (
+                    {p.alive && gameState.phase === 'night' && (
                       <button
                         onClick={() => eliminatePlayer(i)}
-                        className="px-3 py-1 bg-red-500/50 text-white rounded text-sm hover:bg-red-500/70"
+                        className="px-3 py-1 bg-red-500/50 text-white rounded text-xs hover:bg-red-500/70 ml-2"
                       >
                         Elimina
                       </button>
@@ -449,88 +513,121 @@ export default function LupusGame() {
                 <strong>Vivi:</strong> {gameState.players.filter(p => p.alive).length}
                 <br />
                 <strong>Enigmi risolti:</strong> {gameState.riddlesSolved}
+                <br />
+                <strong>Punti totali:</strong> {gameState.totalPoints}
               </p>
             </div>
           </div>
 
-          <div className="lg:col-span-2 bg-white/10 backdrop-blur-lg rounded-lg p-6">
-            <h2 className="text-2xl font-bold text-white mb-4">Fase Diurna - Enigma</h2>
-            
-            {currentRiddle ? (
-              <>
-                {currentRiddle.loading ? (
-                  <div className="text-center py-12">
-                    <div className="animate-spin rounded-full h-16 w-16 border-4 border-white/30 border-t-white mx-auto mb-4"></div>
-                    <p className="text-white">Generazione enigma...</p>
-                  </div>
-                ) : (
-                  <>
-                    <div className="bg-purple-900/40 p-6 rounded-lg mb-6">
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-2 text-white">
-                          <Clock size={24} />
-                          <span className="text-2xl font-bold">{formatTime(timeLeft)}</span>
-                        </div>
-                        {timeLeft === 0 && (
-                          <span className="text-red-400 font-bold">Tempo scaduto!</span>
-                        )}
-                      </div>
-                      
-                      <p className="text-white text-lg mb-4">{currentRiddle.enigma}</p>
-                      
-                      <details className="text-yellow-300 text-sm">
-                        <summary className="cursor-pointer hover:text-yellow-200">💡 Indizio</summary>
-                        <p className="mt-2">{currentRiddle.indizio}</p>
-                      </details>
-                    </div>
-
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        placeholder="Inserisci la risposta..."
-                        value={riddleAnswer}
-                        onChange={(e) => setRiddleAnswer(e.target.value)}
-                        onKeyPress={(e) => e.key === 'Enter' && checkAnswer()}
-                        className="flex-1 px-4 py-3 rounded bg-white/20 text-white placeholder-white/60"
-                      />
-                      <button
-                        onClick={checkAnswer}
-                        className="px-6 py-3 bg-green-500 rounded font-semibold hover:bg-green-600 flex items-center gap-2"
-                      >
-                        <CheckCircle size={20} />
-                        Verifica
-                      </button>
-                    </div>
-
-                    <button
-                      onClick={generateRiddle}
-                      className="mt-4 w-full py-3 bg-blue-500/50 rounded font-semibold text-white hover:bg-blue-500/70"
-                    >
-                      Salta Enigma / Genera Nuovo
-                    </button>
-                  </>
-                )}
-              </>
-            ) : (
+          <div className="lg:col-span-2 bg-white/10 backdrop-blur-lg rounded-lg p-4 sm:p-6">
+            {gameState.phase === 'night' ? (
               <div className="text-center py-12">
+                <Moon size={64} className="mx-auto mb-4 text-blue-300" />
+                <h2 className="text-2xl font-bold text-white mb-4">🌙 Fase Notturna</h2>
+                <p className="text-white/80 mb-6">
+                  I giocatori con ruoli speciali effettuano le loro azioni.<br />
+                  Il narratore coordina: Lupi, Veggente, Guardia, ecc.
+                </p>
                 <button
-                  onClick={generateRiddle}
-                  className="px-8 py-4 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg font-bold text-white text-xl hover:from-purple-600 hover:to-pink-600"
+                  onClick={backToDayPhase}
+                  className="px-8 py-4 bg-gradient-to-r from-yellow-500 to-orange-500 rounded-lg font-bold text-white hover:from-yellow-600 hover:to-orange-600"
                 >
-                  Inizia Fase Diurna
+                  ☀️ Torna alla Fase Diurna
                 </button>
               </div>
-            )}
+            ) : (
+              <>
+                <h2 className="text-xl sm:text-2xl font-bold text-white mb-4">Fase Diurna - Enigma</h2>
+                
+                {currentRiddle ? (
+                  <>
+                    {currentRiddle.loading ? (
+                      <div className="text-center py-12">
+                        <div className="animate-spin rounded-full h-16 w-16 border-4 border-white/30 border-t-white mx-auto mb-4"></div>
+                        <p className="text-white">Generazione enigma...</p>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="bg-purple-900/40 p-4 sm:p-6 rounded-lg mb-4 sm:mb-6">
+                          <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-2 text-white">
+                              <Clock size={20} className="sm:w-6 sm:h-6" />
+                              <span className="text-xl sm:text-2xl font-bold">{formatTime(timeLeft)}</span>
+                            </div>
+                            {timeLeft === 0 && (
+                              <span className="text-red-400 font-bold text-sm sm:text-base">Tempo scaduto!</span>
+                            )}
+                          </div>
+                          
+                          <p className="text-white text-base sm:text-lg mb-4">{currentRiddle.enigma}</p>
+                          
+                          <details className="text-yellow-300 text-sm">
+                            <summary className="cursor-pointer hover:text-yellow-200">💡 Indizio</summary>
+                            <p className="mt-2">{currentRiddle.indizio}</p>
+                          </details>
+                        </div>
 
-            <div className="mt-6 p-4 bg-white/10 rounded">
-              <h3 className="text-white font-bold mb-2">Come funziona:</h3>
-              <ul className="text-white/80 text-sm space-y-1">
-                <li>• Durante il giorno, i giocatori risolvono enigmi insieme</li>
-                <li>• Usa il pulsante "Elimina" per segnare chi viene votato</li>
-                <li>• Gli enigmi sono generati con AI e sempre diversi</li>
-                <li>• Solo tu (Game Master) devi avere l'app aperta</li>
-              </ul>
-            </div>
+                        {timeLeft > 0 ? (
+                          <>
+                            <div className="flex flex-col sm:flex-row gap-2 mb-4">
+                              <input
+                                type="text"
+                                placeholder="Inserisci la risposta..."
+                                value={riddleAnswer}
+                                onChange={(e) => setRiddleAnswer(e.target.value)}
+                                onKeyPress={(e) => e.key === 'Enter' && checkAnswer()}
+                                className="flex-1 px-4 py-3 rounded bg-white/20 text-white placeholder-white/60"
+                              />
+                              <button
+                                onClick={checkAnswer}
+                                className="px-6 py-3 bg-green-500 rounded font-semibold hover:bg-green-600 flex items-center justify-center gap-2 whitespace-nowrap"
+                              >
+                                <CheckCircle size={20} />
+                                Verifica
+                              </button>
+                            </div>
+
+                            <button
+                              onClick={generateRiddle}
+                              className="w-full py-3 bg-blue-500/50 rounded font-semibold text-white hover:bg-blue-500/70 text-sm sm:text-base"
+                            >
+                              Genera Nuovo Enigma
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            onClick={goToNightPhase}
+                            className="w-full py-4 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg font-bold text-white hover:from-indigo-700 hover:to-purple-700 flex items-center justify-center gap-2"
+                          >
+                            <Moon size={24} />
+                            Passa alla Fase Notturna
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </>
+                ) : (
+                  <div className="text-center py-12">
+                    <button
+                      onClick={generateRiddle}
+                      className="px-6 sm:px-8 py-3 sm:py-4 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg font-bold text-white text-lg sm:text-xl hover:from-purple-600 hover:to-pink-600"
+                    >
+                      Inizia Fase Diurna
+                    </button>
+                  </div>
+                )}
+
+                <div className="mt-6 p-4 bg-white/10 rounded">
+                  <h3 className="text-white font-bold mb-2 text-sm sm:text-base">Come funziona:</h3>
+                  <ul className="text-white/80 text-xs sm:text-sm space-y-1">
+                    <li>• Durante il giorno, i giocatori risolvono enigmi insieme</li>
+                    <li>• Più velocemente risolvete, più punti guadagnate!</li>
+                    <li>• Gli enigmi sono generati con AI e sempre diversi</li>
+                    <li>• Solo tu (Game Master) devi avere l'app aperta</li>
+                  </ul>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>
