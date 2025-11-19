@@ -629,14 +629,30 @@ export default function LupusGame() {
               <>
                 <h2 className="text-xl sm:text-2xl font-bold text-white mb-4">Fase Diurna - Enigma</h2>
                 
-                {currentRiddle ? (
-                  <>
-                    {currentRiddle.loading ? (
-                      <div className="text-center py-12">
-                        <div className="animate-spin rounded-full h-16 w-16 border-4 border-white/30 border-t-white mx-auto mb-4"></div>
-                        <p className="text-white">Generazione enigma...</p>
-                      </div>
-                    ) : (
+                {!currentRiddle ? (
+                  <div className="text-center py-12">
+                    <button
+                      onClick={generateRiddle}
+                      className="px-6 sm:px-8 py-3 sm:py-4 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg font-bold text-white text-lg sm:text-xl hover:from-purple-600 hover:to-pink-600 mb-4"
+                    >
+                      Inizia Enigma
+                    </button>
+                    <div className="mt-4">
+                      <button
+                        onClick={goToNightPhase}
+                        className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg font-bold text-white hover:from-indigo-700 hover:to-purple-700 flex items-center justify-center gap-2 mx-auto"
+                      >
+                        <Moon size={20} />
+                        Vai alla Fase Notturna
+                      </button>
+                    </div>
+                  </div>
+                ) : currentRiddle.loading ? (
+                  <div className="text-center py-12">
+                    <div className="animate-spin rounded-full h-16 w-16 border-4 border-white/30 border-t-white mx-auto mb-4"></div>
+                    <p className="text-white">Generazione enigma...</p>
+                  </div>
+                ) : (
                       <>
                         <div className="bg-purple-900/40 p-4 sm:p-6 rounded-lg mb-4 sm:mb-6">
                           <div className="flex items-center justify-between mb-4">
@@ -677,12 +693,21 @@ export default function LupusGame() {
                               </button>
                             </div>
 
-                            <button
-                              onClick={generateRiddle}
-                              className="w-full py-3 bg-blue-500/50 rounded font-semibold text-white hover:bg-blue-500/70 text-sm sm:text-base"
-                            >
-                              Genera Nuovo Enigma
-                            </button>
+                            <div className="flex flex-col sm:flex-row gap-2">
+                              <button
+                                onClick={generateRiddle}
+                                className="flex-1 py-3 bg-blue-500/50 rounded font-semibold text-white hover:bg-blue-500/70 text-sm sm:text-base"
+                              >
+                                Genera Nuovo Enigma
+                              </button>
+                              <button
+                                onClick={goToNightPhase}
+                                className="flex-1 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 rounded font-semibold text-white hover:from-indigo-700 hover:to-purple-700 flex items-center justify-center gap-2 text-sm sm:text-base"
+                              >
+                                <Moon size={18} />
+                                Fase Notturna
+                              </button>
+                            </div>
                           </>
                         ) : (
                           <button
